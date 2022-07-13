@@ -1,0 +1,6 @@
+helmfiles:
+- path: cert-manager/helmfile.yaml
+- path: vault-operator/helmfile.yaml
+- path: vault/helmfile.yaml
+- path: vault-secrets-webhook/helmfile.yaml
+- path: demo/helmfile.yaml

@@ -1,0 +1,137 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: repro-ns1
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: repro-ns2
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: repro
+  namespace: repro-ns1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: repro
+  namespace: repro-ns2
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: echo-secret-found
+  namespace: repro-ns1
+spec:
+  schedule: "* * * * *"
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            vault.security.banzaicloud.io/vault-addr: "http://vault.vault:8200"
+        spec:
+          serviceAccountName: repro
+          containers:
+          - name: hello
+            image: alpine:3.16.0
+            imagePullPolicy: IfNotPresent
+            command:
+            - sh
+            - -c
+            - "echo Found secret $SECRET at secret/data/repro-ns1"
+            env:
+            - name: SECRET
+              value: vault:secret/data/repro-ns1#secret
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: echo-secret-not-found
+  namespace: repro-ns1
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            vault.security.banzaicloud.io/vault-addr: "http://vault.vault:8200"
+        spec:
+          serviceAccountName: repro
+          containers:
+          - name: hello
+            image: alpine:3.16.0
+            imagePullPolicy: IfNotPresent
+            command:
+            - sh
+            - -c
+            - "echo Found secret $SECRET at secret/data/repro-ns2"
+            env:
+            - name: SECRET
+              value: vault:secret/data/repro-ns2#secret
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: echo-secret-found
+  namespace: repro-ns2
+spec:
+  schedule: "* * * * *"
+  successfulJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            vault.security.banzaicloud.io/vault-addr: "http://vault.vault:8200"
+        spec:
+          serviceAccountName: repro
+          containers:
+          - name: hello
+            image: alpine:3.16.0
+            imagePullPolicy: IfNotPresent
+            command:
+            - sh
+            - -c
+            - "echo Found secret $SECRET at secret/data/repro-ns2"
+            env:
+            - name: SECRET
+              value: vault:secret/data/repro-ns2#secret
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: echo-secret-not-found
+  namespace: repro-ns2
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          annotations:
+            vault.security.banzaicloud.io/vault-addr: "http://vault.vault:8200"
+        spec:
+          serviceAccountName: repro
+          containers:
+          - name: hello
+            image: alpine:3.16.0
+            imagePullPolicy: IfNotPresent
+            command:
+            - sh
+            - -c
+            - "echo Found secret $SECRET secret/data/repro-ns1"
+            env:
+            - name: SECRET
+              value: vault:secret/data/repro-ns1#secret
+          restartPolicy: OnFailure

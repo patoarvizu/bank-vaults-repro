@@ -1,0 +1,143 @@
+apiVersion: vault.banzaicloud.com/v1alpha1
+kind: Vault
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  size: 1
+  image: vault:1.11.0
+  bankVaultsImage: bank-vaults:latest
+  serviceAccount: vault
+  unsealConfig:
+    options:
+      preFlightChecks: true
+    kubernetes:
+      secretNamespace: vault
+  tlsAdditionalHosts:
+  - vault
+  caNamespaces:
+  - "*"
+  statsdDisabled: true
+  serviceMonitorEnabled: false
+  config:
+    storage:
+      file:
+        path: /vault/file
+    listener:
+      tcp:
+        address: 0.0.0.0:8200
+        tls_disable: true
+    ui: true
+    api_addr: http://vault.vault.svc:8200
+    cluster_addr: http://${.Env.POD_NAME}:8201
+  volumes:
+  - name: vault-file
+    persistentVolumeClaim:
+      claimName: vault-file
+  volumeMounts:
+  - name: vault-file
+    mountPath: /vault/file
+  externalConfig:
+    policies:
+      - name: templated
+        rules: |
+          path "secret/data/{{ "{{" }}identity.entity.aliases.${ accessor `kubernetes` }.metadata.service_account_namespace{{ "}}" }}" {
+            capabilities = ["read"]
+          }
+    auth:
+    - type: kubernetes
+      roles:
+      - name: repro
+        bound_service_account_names: repro
+        bound_service_account_namespaces:
+        - repro-ns1
+        - repro-ns2
+        token_policies:
+        - templated
+    secrets:
+    - path: secret
+      type: kv
+      description: General secrets.
+      options:
+        version: 2
+    startupSecrets:
+    - type: kv
+      path: secret/data/repro-ns1
+      data:
+        data:
+          secret: foo
+    - type: kv
+      path: secret/data/repro-ns2
+      data:
+        data:
+          secret: bar
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-lb
+  namespace: vault
+spec:
+  ports:
+  - port: 8200
+    protocol: TCP
+    targetPort: 8200
+  selector:
+    app.kubernetes.io/name: vault
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vault-file
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: vault
+  namespace: vault
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: vault-secrets
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - "*"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: vault
+  namespace: vault
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: vault-secrets
+  namespace: vault
+roleRef:
+  kind: ClusterRole
+  name: vault-secrets
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: vault
+  namespace: vault
