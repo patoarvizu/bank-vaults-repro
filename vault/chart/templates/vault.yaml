@@ -6,7 +6,7 @@ metadata:
 spec:
   size: 1
   image: vault:1.11.0
-  bankVaultsImage: bank-vaults:latest
+  bankVaultsImage: patoarvizu/bank-vaults:latest
   serviceAccount: vault
   unsealConfig:
     options:
