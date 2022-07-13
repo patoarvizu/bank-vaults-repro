@@ -1,0 +1,17 @@
+repositories:
+- name: jetstack
+  url: https://charts.jetstack.io
+
+releases:
+- name: cert-manager
+  namespace: cert-manager
+  chart: jetstack/cert-manager
+  version: 1.6.0
+  values:
+  - values.yaml
+
+helmDefaults:
+  kubeContext: k3d-k3s-default
+  args:
+  - --kubeconfig
+  - "{{ env "HOME" }}/.k3d/k3s-default-config"
